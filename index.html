@@ -4,14 +4,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>CYBERPUNK TETRIS - 네온 모던 테트리스</title>
+  <title>CYBERPUNK 3D TETRIS - CYBER SNAKE SURVIVAL</title>
 
-  <!-- 구글 폰트 적용 (사이버펑크 느낌의 Orbitron & Inter 폰트) -->
+  <!-- 구글 폰트 적용 (Orbitron & Inter 폰트) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Orbitron:wght@500;700;900&display=swap"
     rel="stylesheet">
+
+  <!-- 3D 그래픽 엔진 Three.js CDN 로드 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
   <!-- 게임 스타일시트 연결 -->
   <link rel="stylesheet" href="style.css">
@@ -23,17 +26,17 @@
 
     <!-- 게임 제목 및 헤더 영역 -->
     <header class="game-header">
-      <h1 class="neon-title">CYBERPUNK <span class="highlight">TETRIS</span></h1>
+      <h1 class="neon-title">3D SNAKE <span class="highlight">TETRIS</span></h1>
       <div class="header-controls">
         <button id="sound-btn" class="icon-btn" title="음소거 토글">🔊 BGM ON</button>
         <button id="pause-btn" class="icon-btn" title="일시정지">⏸️ PAUSE</button>
       </div>
     </header>
 
-    <!-- 게임 본문 (좌측 패널 - 중앙 캔버스 - 우측 패널) -->
+    <!-- 게임 본문 (좌측 패널 - 중앙 3D 뷰포트 - 우측 패널) -->
     <main class="game-container">
 
-      <!-- 좌측 정보 패널 (Hold & Level & Score) -->
+      <!-- 좌측 정보 패널 (Hold & Stats & Snake Info) -->
       <aside class="panel left-panel">
         <!-- Hold(블록 보관) 박스 -->
         <div class="card hold-card">
@@ -44,32 +47,60 @@
           <span class="sub-text">(Shift / C)</span>
         </div>
 
-        <!-- 점수 및 레벨 정보 박스 -->
+        <!-- 점수, 뱀 상태, 3D TOWER FACE 정보 박스 -->
         <div class="card stats-card">
           <div class="stat-item">
             <span class="stat-label">SCORE</span>
             <span id="score-display" class="stat-value">0</span>
           </div>
-          <div class="stat-item">
-            <span class="stat-label">HIGH SCORE</span>
-            <span id="high-score-display" class="stat-value">0</span>
+
+          <!-- 🐍 3D 자율 뱀 생존 상태 카드 -->
+          <div class="stat-item snake-item">
+            <span class="stat-label">SNAKE STATUS</span>
+            <span id="snake-status-display" class="stat-value highlight-snake">ALIVE 🐍</span>
           </div>
+
           <div class="stat-item">
-            <span class="stat-label">LEVEL</span>
-            <span id="level-display" class="stat-value">1</span>
+            <span class="stat-label">SNAKE BONUS</span>
+            <span id="snake-score-display" class="stat-value">0</span>
           </div>
+
+          <!-- 5줄마다 회전하는 3D 시점 면 표시 -->
+          <div class="stat-item face-item">
+            <span class="stat-label">3D TOWER FACE</span>
+            <span id="face-display" class="stat-value highlight-face">FRONT 0°</span>
+          </div>
+
+          <!-- 1줄마다 커지는 속도 표시 지표 -->
+          <div class="stat-item speed-item">
+            <span class="stat-label">SPEED LEVEL</span>
+            <span id="speed-display" class="stat-value highlight-speed">1.0x</span>
+          </div>
+
           <div class="stat-item">
-            <span class="stat-label">LINES</span>
+            <span class="stat-label">LINES CLEARED</span>
             <span id="lines-display" class="stat-value">0</span>
           </div>
         </div>
       </aside>
 
-      <!-- 중앙 테트리스 보드 캔버스 영역 -->
+      <!-- 중앙 3D 테트리스 보드 뷰포트 영역 -->
       <section class="board-section">
-        <div class="canvas-wrapper">
-          <!-- 메인 게임 캔버스 (가로 10칸, 세로 20칸 / 비율 1:2) -->
-          <canvas id="tetris-canvas" width="300" height="600"></canvas>
+        <div class="canvas-wrapper 3d-wrapper">
+          <!-- 3D 렌더링 컨테이너 -->
+          <div id="canvas-3d-container"></div>
+
+          <!-- 3D 90도 회전 알림 팝업 Banner -->
+          <div id="rotation-banner" class="rotation-banner hidden">
+            <span class="rotate-icon">🌀</span>
+            <span class="rotate-text">3D TOWER ROTATED 90°!</span>
+          </div>
+
+          <!-- 🐍 뱀 피하기/사망 이벤트 알림 팝업 Banner -->
+          <div id="snake-event-banner" class="snake-banner hidden">
+            <span id="snake-banner-icon" class="snake-icon">⚡</span>
+            <span id="snake-banner-text" class="snake-text">SNAKE DODGED! +150</span>
+          </div>
 
           <!-- 일시정지 오버레이 -->
           <div id="pause-overlay" class="overlay hidden">
@@ -94,8 +125,9 @@
           <div id="start-overlay" class="overlay">
             <div class="overlay-content">
               <h2>READY?</h2>
-              <p class="desc">사이버펑크 테트리스에 오신 것을 환영합니다!</p>
-              <button id="start-btn" class="neon-btn main-start-btn">게임 시작</button>
+              <p class="desc">3D 사이버 뱀 생존 테트리스에 오신 것을 환영합니다!</p>
+              <p class="sub-desc">🐍 뱀이 자율 이동하며 1칸 점프합니다! 뱀을 블록으로 누르면 죽으니 피해서 배치하세요!</p>
+              <button id="start-btn" class="neon-btn main-start-btn">3D 게임 시작</button>
             </div>
           </div>
         </div>
@@ -116,7 +148,7 @@
         <div class="card controls-info-card">
           <h3>KEYBOARD</h3>
           <ul>
-            <li><span>← / →</span> : 이동</li>
+            <li><span>← / →</span> : 좌우 이동</li>
             <li><span>↓</span> : 소프트 드롭</li>
             <li><span>Space</span> : 하드 드롭</li>
             <li><span>↑ / W</span> : 시계 회전</li>
@@ -144,7 +176,7 @@
     </footer>
   </div>
 
-  <!-- 자바스크립트 파일 로드 (순서: 오디오 모듈 -> 테트리스 메인 모듈) -->
+  <!-- 자바스크립트 파일 로드 (순서: 오디오 모듈 -> 3D 테트리스 메인 모듈) -->
   <script src="audio.js"></script>
   <script src="tetris.js"></script>
 </body>

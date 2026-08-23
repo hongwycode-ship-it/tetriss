@@ -1,5 +1,5 @@
 /* ==========================================================================
-   CYBERPUNK NEON TETRIS - CSS DESIGN SYSTEM
+   CYBERPUNK 3D NEON TETRIS - CSS DESIGN SYSTEM
    ========================================================================== */
 
 /* 1. 디자인 변수 (컬러 토큰 & 글래스모피즘 설정) */
@@ -32,7 +32,6 @@
   margin: 0;
   padding: 0;
   user-select: none;
-  /* 드래그 및 셀렉션 금지 (게임 인터렉션 시 편의) */
   -webkit-user-select: none;
 }
 
@@ -186,6 +185,33 @@ body {
   text-shadow: 0 0 6px var(--yellow);
 }
 
+/* 🐍 3D 뱀 생존 강조 스타일 */
+.highlight-snake {
+  color: var(--green) !important;
+  text-shadow: 0 0 8px var(--green) !important;
+  font-size: 0.95rem !important;
+}
+
+.highlight-snake.dead {
+  color: var(--magenta) !important;
+  text-shadow: 0 0 8px var(--magenta) !important;
+  animation: pulse-glow 0.5s infinite alternate;
+}
+
+/* 3D TOWER FACE 강조 스타일 */
+.highlight-face {
+  color: var(--magenta) !important;
+  text-shadow: 0 0 10px var(--magenta) !important;
+  font-size: 0.95rem !important;
+}
+
+/* 속도(SPEED) 강조 지표 스타일 */
+.highlight-speed {
+  color: #00ffcc !important;
+  text-shadow: 0 0 8px #00ffcc !important;
+  animation: speed-pulse 1.5s infinite alternate;
+}
+
 /* Next 블록 3개 스타일 */
 .next-previews {
   display: flex;
@@ -217,7 +243,7 @@ body {
   font-weight: bold;
 }
 
-/* 5. 테트리스 캔버스 보드 세션 */
+/* 5. 3D 테트리스 뷰포트 섹션 */
 .board-section {
   display: flex;
   justify-content: center;
@@ -229,15 +255,88 @@ body {
   padding: 4px;
   background: linear-gradient(135deg, rgba(0, 240, 255, 0.4), rgba(255, 0, 127, 0.4));
   box-shadow: 0 0 25px rgba(0, 240, 255, 0.25);
+  width: 310px;
+  height: 610px;
 }
 
-#tetris-canvas {
-  background: #06050e;
+/* 3D WebGL 컨테이너 */
+#canvas-3d-container {
+  width: 100%;
+  height: 100%;
   border-radius: 10px;
-  display: block;
+  overflow: hidden;
+  background: #04030a;
 }
 
-/* 캔버스 오버레이 (일시정지, 게임오버, 시작 화면) */
+#canvas-3d-container canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* 3D 90도 회전 알림 팝업 배너 */
+.rotation-banner {
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 0, 127, 0.85);
+  border: 1px solid #ff007f;
+  box-shadow: 0 0 15px #ff007f;
+  padding: 8px 16px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 15;
+  font-family: var(--font-title);
+  font-size: 0.75rem;
+  color: #ffffff;
+  white-space: nowrap;
+  animation: banner-pulse 0.4s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.rotation-banner.hidden {
+  display: none;
+}
+
+/* 🐍 뱀 피하기/사망 이벤트 배너 */
+.snake-banner {
+  position: absolute;
+  top: 55px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 255, 102, 0.85);
+  border: 1px solid #00ff66;
+  box-shadow: 0 0 15px #00ff66;
+  padding: 6px 14px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 15;
+  font-family: var(--font-title);
+  font-size: 0.7rem;
+  color: #080711;
+  font-weight: bold;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: banner-pulse 0.3s ease-in-out infinite alternate;
+}
+
+.snake-banner.crushed {
+  background: rgba(255, 0, 127, 0.9);
+  border-color: #ff007f;
+  box-shadow: 0 0 15px #ff007f;
+  color: #ffffff;
+}
+
+.snake-banner.hidden {
+  display: none;
+}
+
+/* 캔버스 오버레이 */
 .overlay {
   position: absolute;
   top: 4px;
@@ -250,7 +349,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 10;
+  z-index: 20;
   transition: opacity 0.3s ease;
 }
 
@@ -280,6 +379,12 @@ body {
   font-size: 0.9rem;
   color: var(--text-muted);
   margin-bottom: 20px;
+}
+
+.sub-desc {
+  color: var(--yellow) !important;
+  font-size: 0.8rem !important;
+  margin-top: -12px !important;
 }
 
 .new-record {
@@ -315,7 +420,6 @@ body {
 /* 6. 모바일 온스크린 가상 터치 패드 */
 .touch-controls {
   display: none;
-  /* 기본적으로 데스크톱에서는 숨김 처리 */
   flex-direction: column;
   gap: 8px;
   width: 100%;
@@ -392,12 +496,10 @@ body {
 
   .controls-info-card {
     display: none;
-    /* 모바일에서는 키보드 안내 숨김 */
   }
 
   .touch-controls {
     display: flex;
-    /* 모바일 및 좁은 화면에서 가상 패드 노출 */
   }
 }
 
@@ -410,5 +512,27 @@ body {
   100% {
     transform: scale(1.08);
     opacity: 1;
+  }
+}
+
+@keyframes speed-pulse {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes banner-pulse {
+  0% {
+    transform: translateX(-50%) scale(0.95);
+  }
+
+  100% {
+    transform: translateX(-50%) scale(1.05);
   }
 }

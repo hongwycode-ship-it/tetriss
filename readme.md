@@ -1,33 +1,29 @@
-# 🎮 사이버펑크 네온 웹 테트리스 (CYBERPUNK TETRIS)
+# 🐍 3D CYBER SNAKE SURVIVAL TETRIS (3D 사이버 뱀 생존 테트리스)
 
-외부 프로그램 설치나 복잡한 설정 없이, 웹 브라우저에서 바로 열어서 즐길 수 있는 **사이버펑크 스타일의 모던 테트리스 게임**입니다.
+외부 프로그램 설치 없이 웹 브라우저에서 바로 열어서 즐길 수 있는 **Three.js 기반의 3D 자율 이동 뱀 생존 & 4면 회전 타워 테트리스 게임**입니다.
 
 ---
 
-## 🌟 주요 특징 및 기능
+## 🌟 이번 신규 업그레이드 핵심 재미 요소
 
-1. **🎨 비주얼 테마 (Cyberpunk Neon Glow)**
-   - 어두운 사이버 공간 느낌의 배경과 화려한 네온 컬러 체계
-   - 라인 삭제 시 방출되는 **파티클(Particle) 폭발 이펙트**
-   - 현재 블록의 예측 착지 위치를 보여주는 **Ghost Piece 가이드라인**
+1. **🐍 3D 자율 이동 뱀 캐릭터 (Cyber Snake AI)**
+   - 3D 테트리스 보드의 바닥 및 정착된 블록 표면 위를 매 0.35초마다 **스스로 기어 다니며 움직이는 네온 뱀**이 등장합니다.
+   - **1칸 점프 이동**: 뱀이 가려는 길 앞에 1칸 높이 차이의 블록이 있으면 깡충 점프하여 넘어갑니다.
+   - **2칸 이상 벽 장애물 감지**: 블록 높이 차이가 2칸 이상이면 장애물로 판단하여 스스로 180도 회전하여 도망칩니다.
 
-2. **🕹️ 모던 테트리스 규칙 스펙**
-   - **7-Bag 무작위 시퀀서**: 표준 7개 블록이 균등하게 무작위 출현
-   - **Hold 기능**: 급할 때 블록을 보관하고 원할 때 교체 (`Shift` / `C` 키)
-   - **Next 3개 미리보기**: 다음에 떨어질 블록 3개를 미리 확인하고 전략 수립
-   - **SRS (Super Rotation System) Wall Kick**: 벽에 닿았을 때 부드럽게 회전
-   - **콤보 및 보너스 점수 시스템**: 연속 줄 삭제 시 콤보 점수 증폭
-   - **레벨업 시스템**: 10줄을 삭제할 때마다 레벨이 오르며 블록 낙하 속도 증가
+2. **💥 블록에 깔렸을 때의 찌그러짐 사망 이펙트 (Squished / Crushed)**
+   - 플레이어가 떨어뜨리는 테트리스 블록이 뱀의 위치 위로 내려앉거나 깔릴 경우, 뱀 메쉬가 **납작하게 찌그러지며 (Squished Scale 0.1) 파티클 폭발 이펙트**와 함께 사망합니다.
+   - 사망 시 **`💥 SNAKE CRUSHED!`** 오디오 효과음 및 알림 배너가 출력되며, 2.5초 후 바닥 무작위 위치에서 뱀이 다시 스폰됩니다.
 
-3. **🔊 브라우저 오디오 엔진 (Web Audio API)**
-   - MP3 파일 없이 웹 브라우저가 사운드를 직접 신디사이저로 합성
-   - 이동, 회전, 하드드롭, 라인 삭제, 테트리스 4줄 삭제, 게임오버 및 **사이버 BGM 멜로디** 지원
+3. **🏆 뱀 피하기 생존 & 보너스 점수 시스템 (Snake Score)**
+   - **실시간 생존 보너스**: 뱀이 무사히 살아있는 동안 매 초마다 `+10pts` 자동 획득!
+   - **아슬아슬 피하기 성공 (DODGE!)**: 떨어지는 블록이 뱀 근처(1~2칸 거리)에 착지했지만 뱀이 안 깔리고 살아남으면 **`⚡ SNAKE DODGED! +150pts`** 보너스!
+   - **뱀과 함께 라인 클리어**: 뱀이 살아있는 상태에서 라인을 삭제하면 **`🐍 CYBER SNAKE SAVED! +300pts`** 대박 보너스!
+   - UI 좌측의 **`SNAKE STATUS`** (`ALIVE 🐍` / `CRUSHED 💥`) 및 **`SNAKE BONUS`** 지표에서 확인 가능합니다.
 
-4. **📱 모바일 / 태블릿 온스크린 버튼 지원**
-   - 화면 크기가 작은 스마트폰이나 터치 기기에서도 화면 하단의 네온 버튼으로 플레이 가능
-
-5. **💾 기록 자동 저장**
-   - `LocalStorage`를 이용해 최고 점수(High Score)를 자동으로 기록하고 보존
+4. **🌀 5줄마다 3D 카메라 90° 회전 & ⚡ 1줄마다 속도 상승**
+   - 5줄 지울 때마다 3D 카메라 90도 회전 (`FRONT 0°` ➔ `RIGHT 90°` ➔ `BACK 180°` ➔ `LEFT 270°`).
+   - 1줄 지울 때마다 블록 낙하 속도 약 3%씩 누적 증가.
 
 ---
 
@@ -48,54 +44,23 @@
 
 ## 💻 로컬 서버 실행 방법 (localhost)
 
-프로젝트 폴더 터미널에서 다음 명령어를 실행하면 `localhost:3000` 주소로 개발 서버가 실행됩니다:
+터미널에서 아래 명령어로 서버를 띄우고 접속합니다:
 
 ```bash
 npm run dev
 ```
-실행 후 브라우저 주소창에 `http://localhost:3000` 을 입력하여 접속할 수 있습니다.
+접속 주소: **`http://localhost:8080`**
 
 ---
 
-## 🌐 GitHub Pages로 무료 배포하는 방법 (온라인 접속용)
-
-이 프로젝트는 `.github/workflows/deploy.yml` 파일이 포함되어 있어, GitHub 레포지토리에 올려두기만 하면 무료로 웹사이트 주소가 생깁니다!
-
-### 1단계: Git 저장소 초기화 및 커밋
-터미널에서 아래 명령어들을 순서대로 실행합니다:
+## 🌐 GitHub Pages 무료 배포 방법
 
 ```bash
-# 1. git 저장소 생성
 git init
-
-# 2. 모든 파일 추가 및 첫 커밋
 git add .
-git commit -m "Initial commit: Cyberpunk Tetris Game"
-```
-
-### 2단계: GitHub 저장소(Repository) 생성 및 연결
-1. [GitHub 홈페이지](https://github.com)에 로그인 후, 우측 상단 **[ + ] -> [New repository]** 클릭
-2. Repository name에 `tetris` 입력 후 **[Create repository]** 버튼 클릭
-3. 생성된 화면에 표시되는 주소를 복사하여 터미널에 입력 (아래 `YOUR_USERNAME`을 본인 계정명으로 변경):
-
-```bash
+git commit -m "Update: Add 3D Auto-moving Cyber Snake AI & Survival Dodge Score"
 git branch -M main
 git remote add origin https://github.com/YOUR_USERNAME/tetris.git
 git push -u origin main
 ```
-
-### 3단계: GitHub Pages 활성화
-1. GitHub 저장소 페이지 상단의 **[Settings]** 탭 클릭
-2. 좌측 메뉴에서 **[Pages]** 클릭
-3. **Build and deployment** 항목의 **Source**를 **[GitHub Actions]** 로 변경
-4. 커밋이 push될 때마다 몇 초 뒤 `https://YOUR_USERNAME.github.io/tetris/` 주소로 게임이 무료 배포됩니다!
-
----
-
-## 📁 프로젝트 코드 구조 안내
-
-- [`index.html`](file:///c:/codes/tetriss/index.html): 게임 메인 레이아웃 및 캔버스 요소
-- [`style.css`](file:///c:/codes/tetriss/style.css): 사이버펑크 네온 비주얼 및 글래스모피즘 CSS
-- [`audio.js`](file:///c:/codes/tetriss/audio.js): Web Audio API 사운드합성 오디오 모듈
-- [`tetris.js`](file:///c:/codes/tetriss/tetris.js): 테트리스 게임 엔진 & 알고리즘
-- [`.github/workflows/deploy.yml`](file:///c:/codes/tetriss/.github/workflows/deploy.yml): GitHub Pages 자동 배포 워크플로우
+GitHub 저장소의 **Settings -> Pages -> Source를 [GitHub Actions]** 로 지정하면 배포됩니다.
