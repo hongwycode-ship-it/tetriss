@@ -1,7 +1,7 @@
 /**
  * ==========================================================================
  * CYBERPUNK 3D TETRIS - MAIN ENGINE (Three.js 기반 3D 입체 테트리스)
- * - Three.js 3D 공간 렌더링
+ * - Three.js 3D 공간 렌더링 (CDN 로딩 실패 시 예외 처리 보강)
  * - 🐍 3D 자율 이동 뱀(Cyber Snake) 캐릭터 AI (1칸 점프, 깔림 사망, 피하기 점수)
  * - 5줄 지울 때마다 3D 타워 90도 카메라 회전 (4면 뷰포트 전환)
  * - 한 줄(1 라인) 지울 때마다 낙하 속도 즉시 증가 시스템
@@ -84,30 +84,27 @@ class CyberSnake3D {
   constructor(game) {
     this.game = game;
 
-    // 뱀 마디 데이터 (마디 4개)
     this.segmentCount = 4;
-    this.segments = []; // { x, y } 2D 보드 좌표 배열
+    this.segments = [];
 
-    this.dirX = 1; // 1: 우측 이동, -1: 좌측 이동
+    this.dirX = 1;
     this.isDead = false;
     this.moveTimer = 0;
-    this.moveInterval = 350; // 0.35초마다 1칸 이동
+    this.moveInterval = 350;
 
-    this.snakeGroup = new THREE.Group();
-    this.game.scene.add(this.snakeGroup);
-
-    this.respawnTimer = null;
-
-    // 초기 뱀 위치 스폰
-    this.spawn();
+    if (window.THREE && this.game.scene) {
+      this.snakeGroup = new THREE.Group();
+      this.game.scene.add(this.snakeGroup);
+      this.spawn();
+    }
   }
 
-  // 뱀 3D 메쉬 생성 및 스폰
   spawn() {
+    if (!window.THREE || !this.snakeGroup) return;
+
     this.isDead = false;
     this.dirX = Math.random() > 0.5 ? 1 : -1;
 
-    // 바닥 행(ROWS - 1) 무작위 컬럼에서 시작
     const startX = Math.floor(Math.random() * (COLS - 3)) + 1;
     const startY = this.game.getTopRowAt(startX);
 
@@ -116,19 +113,17 @@ class CyberSnake3D {
       this.segments.push({ x: startX, y: startY });
     }
 
-    // 이전 3D 메쉬 제거
     while (this.snakeGroup.children.length > 0) {
       const obj = this.snakeGroup.children[0];
       this.snakeGroup.remove(obj);
       if (obj.geometry) obj.geometry.dispose();
     }
 
-    // 마디별 3D 구체(Sphere) 메쉬 생성
     this.meshList = [];
     for (let i = 0; i < this.segmentCount; i++) {
-      const radius = i === 0 ? 0.42 : 0.32 - i * 0.04; // 머리가 제일 큼
+      const radius = i === 0 ? 0.42 : 0.32 - i * 0.04;
       const geom = new THREE.SphereGeometry(radius, 14, 14);
-      const colorHex = i === 0 ? 0x00ff66 : 0xccff00; // 머리는 네온그린, 몸통은 연두색
+      const colorHex = i === 0 ? 0x00ff66 : 0xccff00;
       const mat = new THREE.MeshStandardMaterial({
         color: colorHex,
         emissive: colorHex,
@@ -145,19 +140,18 @@ class CyberSnake3D {
     this.game.updateSnakeUI(true);
   }
 
-  // 3D 공간 상의 뱀 위치 갱신
   update3DPosition() {
+    if (!this.meshList) return;
     for (let i = 0; i < this.segments.length; i++) {
       const seg = this.segments[i];
       const pos = this.game.gridTo3D(seg.x, seg.y);
       if (this.meshList[i]) {
-        this.meshList[i].position.set(pos.x, pos.y, pos.z + 0.1); // 블록보다 약간 앞으로 돌출
-        this.meshList[i].scale.set(1, 1, 1); // 스케일 원복
+        this.meshList[i].position.set(pos.x, pos.y, pos.z + 0.1);
+        this.meshList[i].scale.set(1, 1, 1);
       }
     }
   }
 
-  // 🐍 자율 이동 AI (1칸 점프 제한 및 지형 탐색)
   updateAI(deltaTime) {
     if (this.isDead || !this.game.isPlaying || this.game.isPaused) return;
 
@@ -168,32 +162,25 @@ class CyberSnake3D {
     const head = this.segments[0];
     let nextX = head.x + this.dirX;
 
-    // 보드 벽 도착 시 즉시 방향 반전
     if (nextX < 0 || nextX >= COLS) {
       this.dirX *= -1;
       nextX = head.x + this.dirX;
     }
 
-    // 머리가 서 있는 현재 행과 목표 컬럼의 최상단 행 탐색
     const currentTopY = this.game.getTopRowAt(head.x);
     const targetTopY = this.game.getTopRowAt(nextX);
 
-    // 🌟 핵심 요구사항: 점프는 1칸만 가능!
-    // 현재 행보다 목표 행이 위쪽에 있는 경우 (targetTopY < currentTopY)
     const heightDifference = currentTopY - targetTopY;
 
     let canMove = false;
     let nextY = targetTopY;
 
     if (heightDifference === 1) {
-      // 1칸 차이: 깡충 점프 성공!
       canMove = true;
-      audioManager.playSnakeJump();
+      try { audioManager.playSnakeJump(); } catch (e) { }
     } else if (heightDifference <= 0) {
-      // 동일 높이 또는 아래로 미끄러짐 이동 가능
       canMove = true;
     } else {
-      // 높이 차이가 2칸 이상: 점프 불가능! 장애물에 막힘 ➔ 방향 반전
       this.dirX *= -1;
       nextX = head.x + this.dirX;
       const altTargetY = this.game.getTopRowAt(nextX);
@@ -204,7 +191,6 @@ class CyberSnake3D {
     }
 
     if (canMove && nextX >= 0 && nextX < COLS) {
-      // 몸통 마디 한 칸씩 밀기
       for (let i = this.segments.length - 1; i > 0; i--) {
         this.segments[i].x = this.segments[i - 1].x;
         this.segments[i].y = this.segments[i - 1].y;
@@ -216,11 +202,9 @@ class CyberSnake3D {
     }
   }
 
-  // 💥 뱀이 블록에 눌려 찌그러져 사망하는 처리
   checkCrush(boardGrid) {
-    if (this.isDead) return;
+    if (this.isDead || !this.segments) return;
 
-    // 뱀 마디 중 하나라도 정착된 블록의 위치와 겹치는 경우
     for (let seg of this.segments) {
       if (seg.y >= 0 && seg.y < ROWS && seg.x >= 0 && seg.x < COLS) {
         if (boardGrid[seg.y][seg.x] !== 0) {
@@ -231,26 +215,24 @@ class CyberSnake3D {
     }
   }
 
-  // 뱀 사망 애니메이션 및 리스폰
   die() {
     if (this.isDead) return;
     this.isDead = true;
 
-    // 납작하게 찌그러지는 Squish 효과 (Y축 Scale 0.1)
-    this.meshList.forEach(mesh => {
-      mesh.scale.set(1.5, 0.1, 1.5);
-    });
+    if (this.meshList) {
+      this.meshList.forEach(mesh => {
+        mesh.scale.set(1.5, 0.1, 1.5);
+      });
+    }
 
-    // 3D 파티클 폭발 이펙트 생성
     const head = this.segments[0];
     const pos = this.game.gridTo3D(head.x, head.y);
     this.game.create3DParticles(pos.x, pos.y, pos.z, 0xff007f);
 
-    audioManager.playSnakeCrush();
+    try { audioManager.playSnakeCrush(); } catch (e) { }
     this.game.showSnakeEventBanner("💥 SNAKE CRUSHED!", true);
     this.game.updateSnakeUI(false);
 
-    // 2.5초 후 바닥에서 재스폰
     clearTimeout(this.respawnTimer);
     this.respawnTimer = setTimeout(() => {
       if (this.game.isPlaying && !this.game.isGameOver) {
@@ -275,7 +257,6 @@ class Tetris3DGame {
     this.next3Canvas = document.getElementById('next3-canvas');
     this.next3Ctx = this.next3Canvas.getContext('2d');
 
-    // HTML DOM UI 요소
     this.scoreDisplay = document.getElementById('score-display');
     this.highScoreDisplay = document.getElementById('high-score-display');
     this.speedDisplay = document.getElementById('speed-display');
@@ -289,14 +270,12 @@ class Tetris3DGame {
     this.snakeBannerIcon = document.getElementById('snake-banner-icon');
     this.snakeBannerText = document.getElementById('snake-banner-text');
 
-    // 모달 오버레이
     this.startOverlay = document.getElementById('start-overlay');
     this.pauseOverlay = document.getElementById('pause-overlay');
     this.gameoverOverlay = document.getElementById('gameover-overlay');
     this.finalScoreText = document.getElementById('final-score');
     this.newHighScoreMsg = document.getElementById('new-high-score-msg');
 
-    // 게임 변수
     this.grid = this.createGrid();
     this.score = 0;
     this.snakeScore = 0;
@@ -310,7 +289,6 @@ class Tetris3DGame {
     this.holdPiece = null;
     this.canHold = true;
 
-    // 3D 카메라 회전 관련 변수
     this.currentCameraAngle = 0;
     this.targetCameraAngle = 0;
     this.cameraRadius = 24;
@@ -318,13 +296,11 @@ class Tetris3DGame {
     this.faceNames = ['FRONT 0°', 'RIGHT 90°', 'BACK 180°', 'LEFT 270°'];
     this.faceIndex = 0;
 
-    // 3D 메쉬 보관 배열
     this.gridMeshes = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
     this.activeBlockMeshes = [];
     this.ghostBlockMeshes = [];
     this.particles3D = [];
 
-    // 속도 설정
     this.dropCounter = 0;
     this.initialDropInterval = 1000;
     this.dropInterval = 1000;
@@ -335,28 +311,33 @@ class Tetris3DGame {
     this.isGameOver = false;
     this.isPlaying = false;
 
-    this.highScoreDisplay.textContent = this.highScore;
+    if (this.highScoreDisplay) {
+      this.highScoreDisplay.textContent = this.highScore;
+    }
 
-    // Three.js 인스턴스 설정
-    this.initThreeJS();
-
-    // 🐍 3D 자율 뱀 객체 생성
-    this.snake = new CyberSnake3D(this);
+    // 🌟 Three.js 예외 처리 보강
+    if (!window.THREE) {
+      console.warn("Three.js 라이브러리가 로드되지 않았습니다. CDN 연결을 확인해 주세요.");
+    } else {
+      this.initThreeJS();
+      this.snake = new CyberSnake3D(this);
+    }
 
     this.bindEvents();
   }
 
-  // 컬럼의 최상단 정착 블록 행(row) 탐색
   getTopRowAt(col) {
     for (let r = 0; r < ROWS; r++) {
       if (this.grid[r][col] !== 0) {
         return r;
       }
     }
-    return ROWS - 1; // 블록이 없으면 맨 바닥
+    return ROWS - 1;
   }
 
   initThreeJS() {
+    if (!window.THREE) return;
+
     const width = this.container.clientWidth || 300;
     const height = this.container.clientHeight || 600;
 
@@ -389,6 +370,8 @@ class Tetris3DGame {
   }
 
   createBoardBoundary3D() {
+    if (!window.THREE || !this.scene) return;
+
     const frameGroup = new THREE.Group();
 
     const geometry = new THREE.PlaneGeometry(COLS, ROWS);
@@ -417,6 +400,7 @@ class Tetris3DGame {
   }
 
   updateCameraPosition() {
+    if (!this.camera) return;
     this.camera.position.x = this.cameraRadius * Math.sin(this.currentCameraAngle);
     this.camera.position.z = this.cameraRadius * Math.cos(this.currentCameraAngle);
     this.camera.position.y = 1;
@@ -431,6 +415,8 @@ class Tetris3DGame {
   }
 
   createSingleCube3D(colorHex, isGhost = false) {
+    if (!window.THREE) return null;
+
     const size = 0.92;
     const geometry = new THREE.BoxGeometry(size, size, size);
 
@@ -535,7 +521,9 @@ class Tetris3DGame {
     if (!this.checkCollision(newX, newY, this.currentPiece.shape)) {
       this.currentPiece.x = newX;
       this.currentPiece.y = newY;
-      if (dirX !== 0) audioManager.playMove();
+      if (dirX !== 0) {
+        try { audioManager.playMove(); } catch (e) { }
+      }
       return true;
     } else if (dirY > 0) {
       this.lockPiece();
@@ -560,7 +548,7 @@ class Tetris3DGame {
     }
     this.score += dropDistance * 2;
     this.updateScoreUI();
-    audioManager.playDrop();
+    try { audioManager.playDrop(); } catch (e) { }
     this.lockPiece();
   }
 
@@ -586,7 +574,7 @@ class Tetris3DGame {
       if (!this.checkCollision(this.currentPiece.x + kick, this.currentPiece.y, rotated)) {
         this.currentPiece.x += kick;
         this.currentPiece.shape = rotated;
-        audioManager.playRotate();
+        try { audioManager.playRotate(); } catch (e) { }
         return;
       }
     }
@@ -595,7 +583,7 @@ class Tetris3DGame {
   hold() {
     if (!this.isPlaying || this.isPaused || this.isGameOver || !this.canHold) return;
 
-    audioManager.playMove();
+    try { audioManager.playMove(); } catch (e) { }
 
     if (!this.holdPiece) {
       this.holdPiece = this.currentPiece.type;
@@ -617,7 +605,6 @@ class Tetris3DGame {
     this.drawHoldPreview();
   }
 
-  // 블록 고정 및 🐍 뱀 피하기 성공 판정
   lockPiece() {
     const { shape, x, y, color } = this.currentPiece;
 
@@ -630,30 +617,29 @@ class Tetris3DGame {
           if (boardY >= 0 && boardY < ROWS && boardX >= 0 && boardX < COLS) {
             this.grid[boardY][boardX] = { color };
 
-            const cubeMesh = this.createSingleCube3D(color);
-            const pos = this.gridTo3D(boardX, boardY);
-            cubeMesh.position.set(pos.x, pos.y, pos.z);
-            this.scene.add(cubeMesh);
+            if (window.THREE && this.scene) {
+              const cubeMesh = this.createSingleCube3D(color);
+              const pos = this.gridTo3D(boardX, boardY);
+              cubeMesh.position.set(pos.x, pos.y, pos.z);
+              this.scene.add(cubeMesh);
 
-            this.gridMeshes[boardY][boardX] = cubeMesh;
+              this.gridMeshes[boardY][boardX] = cubeMesh;
+            }
           }
         }
       }
     }
 
-    // 🐍 뱀 피하기 성공 보너스 판정
-    if (this.snake && !this.snake.isDead) {
+    if (this.snake && !this.snake.isDead && this.snake.segments && this.snake.segments.length > 0) {
       const snakeHead = this.snake.segments[0];
       const dist = Math.abs(snakeHead.x - x);
-      // 바로 근처에 블록이 떨어졌지만 뱀이 깔리지 않고 살아남음!
       if (dist <= 2) {
         this.addSnakeScore(150);
         this.showSnakeEventBanner("⚡ SNAKE DODGED! +150", false);
-        audioManager.playSnakeDodge();
+        try { audioManager.playSnakeDodge(); } catch (e) { }
       }
     }
 
-    // 💥 뱀 깔림 충돌 검사
     if (this.snake) {
       this.snake.checkCrush(this.grid);
     }
@@ -664,7 +650,6 @@ class Tetris3DGame {
     this.drawHoldPreview();
   }
 
-  // 라인 지우기
   clearLines() {
     let linesCleared = 0;
 
@@ -677,8 +662,8 @@ class Tetris3DGame {
           const pos = this.gridTo3D(c, r);
 
           if (this.gridMeshes[r][c]) {
-            this.scene.remove(this.gridMeshes[r][c]);
-            this.gridMeshes[r][c].geometry.dispose();
+            if (this.scene) this.scene.remove(this.gridMeshes[r][c]);
+            if (this.gridMeshes[r][c].geometry) this.gridMeshes[r][c].geometry.dispose();
             this.gridMeshes[r][c] = null;
           }
 
@@ -711,7 +696,6 @@ class Tetris3DGame {
       let gainedScore = baseScores[linesCleared];
       if (this.combo > 1) gainedScore += (this.combo - 1) * 50;
 
-      // 🐍 뱀이 생존해 있을 때 라인 삭제 시 생존 보너스!
       if (this.snake && !this.snake.isDead) {
         gainedScore += 300;
         this.addSnakeScore(300);
@@ -721,10 +705,8 @@ class Tetris3DGame {
       this.score += gainedScore;
       this.lines += linesCleared;
 
-      // 1줄마다 속도 3% 증가
       this.dropInterval = Math.max(60, Math.floor(this.initialDropInterval * Math.pow(0.97, this.lines)));
 
-      // 5줄마다 3D 90도 회전
       const currentRotationCount = Math.floor(this.lines / 5);
       if (currentRotationCount > this.lastRotationThreshold) {
         const rotationSteps = currentRotationCount - this.lastRotationThreshold;
@@ -733,14 +715,14 @@ class Tetris3DGame {
         this.targetCameraAngle += (Math.PI / 2) * rotationSteps;
         this.faceIndex = (this.faceIndex + rotationSteps) % 4;
 
-        audioManager.play3DRotateWarp();
+        try { audioManager.play3DRotateWarp(); } catch (e) { }
         this.showRotationBanner();
       }
 
       if (linesCleared === 4) {
-        audioManager.playTetris();
+        try { audioManager.playTetris(); } catch (e) { }
       } else {
-        audioManager.playClear();
+        try { audioManager.playClear(); } catch (e) { }
       }
 
       this.updateScoreUI();
@@ -759,7 +741,7 @@ class Tetris3DGame {
     if (this.rotationBanner) {
       this.rotationBanner.classList.remove('hidden');
       setTimeout(() => {
-        this.rotationBanner.classList.add('hidden');
+        if (this.rotationBanner) this.rotationBanner.classList.add('hidden');
       }, 1500);
     }
   }
@@ -775,7 +757,7 @@ class Tetris3DGame {
 
       this.snakeEventBanner.classList.remove('hidden');
       setTimeout(() => {
-        this.snakeEventBanner.classList.add('hidden');
+        if (this.snakeEventBanner) this.snakeEventBanner.classList.add('hidden');
       }, 1600);
     }
   }
@@ -793,6 +775,8 @@ class Tetris3DGame {
   }
 
   create3DParticles(x, y, z, colorHex) {
+    if (!window.THREE || !this.scene) return;
+
     const particleCount = 4;
     const geom = new THREE.BoxGeometry(0.25, 0.25, 0.25);
     const mat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 1 });
@@ -813,6 +797,7 @@ class Tetris3DGame {
   }
 
   update3DParticles() {
+    if (!window.THREE) return;
     for (let i = this.particles3D.length - 1; i >= 0; i--) {
       const p = this.particles3D[i];
       p.mesh.position.x += p.vx;
@@ -823,7 +808,7 @@ class Tetris3DGame {
       p.mesh.material.opacity = p.life / 30;
 
       if (p.life <= 0) {
-        this.scene.remove(p.mesh);
+        if (this.scene) this.scene.remove(p.mesh);
         p.mesh.geometry.dispose();
         p.mesh.material.dispose();
         this.particles3D.splice(i, 1);
@@ -841,6 +826,8 @@ class Tetris3DGame {
   }
 
   updateActivePieceMeshes3D() {
+    if (!window.THREE || !this.scene) return;
+
     this.activeBlockMeshes.forEach(mesh => {
       this.scene.remove(mesh);
       if (mesh.geometry) mesh.geometry.dispose();
@@ -862,10 +849,12 @@ class Tetris3DGame {
       for (let c = 0; c < shape[r].length; c++) {
         if (shape[r][c] !== 0) {
           const ghostMesh = this.createSingleCube3D(color, true);
-          const pos = this.gridTo3D(x + c, ghostY + r);
-          ghostMesh.position.set(pos.x, pos.y, pos.z);
-          this.scene.add(ghostMesh);
-          this.ghostBlockMeshes.push(ghostMesh);
+          if (ghostMesh) {
+            const pos = this.gridTo3D(x + c, ghostY + r);
+            ghostMesh.position.set(pos.x, pos.y, pos.z);
+            this.scene.add(ghostMesh);
+            this.ghostBlockMeshes.push(ghostMesh);
+          }
         }
       }
     }
@@ -874,10 +863,12 @@ class Tetris3DGame {
       for (let c = 0; c < shape[r].length; c++) {
         if (shape[r][c] !== 0) {
           const cubeMesh = this.createSingleCube3D(color, false);
-          const pos = this.gridTo3D(x + c, y + r);
-          cubeMesh.position.set(pos.x, pos.y, pos.z);
-          this.scene.add(cubeMesh);
-          this.activeBlockMeshes.push(cubeMesh);
+          if (cubeMesh) {
+            const pos = this.gridTo3D(x + c, y + r);
+            cubeMesh.position.set(pos.x, pos.y, pos.z);
+            this.scene.add(cubeMesh);
+            this.activeBlockMeshes.push(cubeMesh);
+          }
         }
       }
     }
@@ -891,18 +882,22 @@ class Tetris3DGame {
     ];
 
     canvases.forEach(({ ctx, canvas }, index) => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const pieceType = this.nextQueue[index];
-      if (pieceType) {
-        this.drawMiniPreview(ctx, canvas, pieceType);
+      if (ctx && canvas) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const pieceType = this.nextQueue[index];
+        if (pieceType) {
+          this.drawMiniPreview(ctx, canvas, pieceType);
+        }
       }
     });
   }
 
   drawHoldPreview() {
-    this.holdCtx.clearRect(0, 0, this.holdCanvas.width, this.holdCanvas.height);
-    if (this.holdPiece) {
-      this.drawMiniPreview(this.holdCtx, this.holdCanvas, this.holdPiece);
+    if (this.holdCtx && this.holdCanvas) {
+      this.holdCtx.clearRect(0, 0, this.holdCanvas.width, this.holdCanvas.height);
+      if (this.holdPiece) {
+        this.drawMiniPreview(this.holdCtx, this.holdCanvas, this.holdPiece);
+      }
     }
   }
 
@@ -929,39 +924,37 @@ class Tetris3DGame {
   }
 
   updateScoreUI() {
-    this.scoreDisplay.textContent = this.score;
-    this.snakeScoreDisplay.textContent = this.snakeScore;
-    this.linesDisplay.textContent = this.lines;
-    this.faceDisplay.textContent = this.faceNames[this.faceIndex];
+    if (this.scoreDisplay) this.scoreDisplay.textContent = this.score;
+    if (this.snakeScoreDisplay) this.snakeScoreDisplay.textContent = this.snakeScore;
+    if (this.linesDisplay) this.linesDisplay.textContent = this.lines;
+    if (this.faceDisplay) this.faceDisplay.textContent = this.faceNames[this.faceIndex];
 
-    const speedMultiplier = (1000 / this.dropInterval).toFixed(1);
-    this.speedDisplay.textContent = `${speedMultiplier}x`;
+    if (this.speedDisplay) {
+      const speedMultiplier = (1000 / this.dropInterval).toFixed(1);
+      this.speedDisplay.textContent = `${speedMultiplier}x`;
+    }
 
     if (this.score > this.highScore) {
       this.highScore = this.score;
-      this.highScoreDisplay.textContent = this.highScore;
+      if (this.highScoreDisplay) this.highScoreDisplay.textContent = this.highScore;
       localStorage.setItem('tetris_high_score', this.highScore);
     }
   }
 
-  // 16. 3D 메인 게임 렌더 루프
   update(time = 0) {
     const deltaTime = time - this.lastTime;
     this.lastTime = time;
 
     if (this.isPlaying && !this.isPaused && !this.isGameOver) {
-      // 테트리스 블록 자동 낙하 연산
       this.dropCounter += deltaTime;
       if (this.dropCounter > this.dropInterval) {
         this.move(0, 1);
         this.dropCounter = 0;
       }
 
-      // 🐍 3D 자율 뱀 AI 업데이트
       if (this.snake) {
         this.snake.updateAI(deltaTime);
 
-        // 뱀 실시간 생존 보너스 (매 초마다 +10pts)
         if (!this.snake.isDead) {
           this.snakeSurvivalTimer += deltaTime;
           if (this.snakeSurvivalTimer >= 1000) {
@@ -972,19 +965,21 @@ class Tetris3DGame {
       }
     }
 
-    // 3D 카메라 보간 회전
-    this.currentCameraAngle += (this.targetCameraAngle - this.currentCameraAngle) * 0.06;
-    this.updateCameraPosition();
+    if (window.THREE && this.scene && this.camera && this.renderer) {
+      this.currentCameraAngle += (this.targetCameraAngle - this.currentCameraAngle) * 0.06;
+      this.updateCameraPosition();
 
-    this.updateActivePieceMeshes3D();
-    this.update3DParticles();
+      this.updateActivePieceMeshes3D();
+      this.update3DParticles();
 
-    this.renderer.render(this.scene, this.camera);
+      this.renderer.render(this.scene, this.camera);
+    }
 
     requestAnimationFrame(this.update.bind(this));
   }
 
   clearBoard3DMeshes() {
+    if (!window.THREE || !this.scene) return;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         if (this.gridMeshes[r][c]) {
@@ -997,6 +992,9 @@ class Tetris3DGame {
   }
 
   start() {
+    // 오디오 컨텍스트 사용자 상호작용 후 안전 활성화
+    try { audioManager.init(); } catch (e) { }
+
     this.clearBoard3DMeshes();
     this.grid = this.createGrid();
     this.score = 0;
@@ -1018,7 +1016,6 @@ class Tetris3DGame {
     this.isGameOver = false;
     this.isPlaying = true;
 
-    // 🐍 뱀 리스폰
     if (this.snake) {
       this.snake.spawn();
     }
@@ -1028,11 +1025,11 @@ class Tetris3DGame {
     this.drawNextPreviews();
     this.drawHoldPreview();
 
-    this.startOverlay.classList.add('hidden');
-    this.pauseOverlay.classList.add('hidden');
-    this.gameoverOverlay.classList.add('hidden');
+    if (this.startOverlay) this.startOverlay.classList.add('hidden');
+    if (this.pauseOverlay) this.pauseOverlay.classList.add('hidden');
+    if (this.gameoverOverlay) this.gameoverOverlay.classList.add('hidden');
 
-    audioManager.startBGM();
+    try { audioManager.startBGM(); } catch (e) { }
   }
 
   togglePause() {
@@ -1040,11 +1037,11 @@ class Tetris3DGame {
     this.isPaused = !this.isPaused;
 
     if (this.isPaused) {
-      this.pauseOverlay.classList.remove('hidden');
-      audioManager.stopBGM();
+      if (this.pauseOverlay) this.pauseOverlay.classList.remove('hidden');
+      try { audioManager.stopBGM(); } catch (e) { }
     } else {
-      this.pauseOverlay.classList.add('hidden');
-      audioManager.startBGM();
+      if (this.pauseOverlay) this.pauseOverlay.classList.add('hidden');
+      try { audioManager.startBGM(); } catch (e) { }
     }
   }
 
@@ -1052,21 +1049,24 @@ class Tetris3DGame {
     this.isGameOver = true;
     this.isPlaying = false;
 
-    audioManager.stopBGM();
-    audioManager.playGameOver();
+    try {
+      audioManager.stopBGM();
+      audioManager.playGameOver();
+    } catch (e) { }
 
-    this.finalScoreText.textContent = this.score;
+    if (this.finalScoreText) this.finalScoreText.textContent = this.score;
 
     if (this.score >= this.highScore && this.score > 0) {
-      this.newHighScoreMsg.classList.remove('hidden');
+      if (this.newHighScoreMsg) this.newHighScoreMsg.classList.remove('hidden');
     } else {
-      this.newHighScoreMsg.classList.add('hidden');
+      if (this.newHighScoreMsg) this.newHighScoreMsg.classList.add('hidden');
     }
 
-    this.gameoverOverlay.classList.remove('hidden');
+    if (this.gameoverOverlay) this.gameoverOverlay.classList.remove('hidden');
   }
 
   onWindowResize() {
+    if (!window.THREE || !this.camera || !this.renderer || !this.container) return;
     const width = this.container.clientWidth || 300;
     const height = this.container.clientHeight || 600;
     this.camera.aspect = width / height;
@@ -1120,24 +1120,48 @@ class Tetris3DGame {
       }
     });
 
-    document.getElementById('start-btn').addEventListener('click', () => this.start());
-    document.getElementById('restart-btn').addEventListener('click', () => this.start());
-    document.getElementById('pause-btn').addEventListener('click', () => this.togglePause());
-    document.getElementById('resume-btn').addEventListener('click', () => this.togglePause());
+    const startBtn = document.getElementById('start-btn');
+    if (startBtn) startBtn.addEventListener('click', () => this.start());
+
+    const restartBtn = document.getElementById('restart-btn');
+    if (restartBtn) restartBtn.addEventListener('click', () => this.start());
+
+    const pauseBtn = document.getElementById('pause-btn');
+    if (pauseBtn) pauseBtn.addEventListener('click', () => this.togglePause());
+
+    const resumeBtn = document.getElementById('resume-btn');
+    if (resumeBtn) resumeBtn.addEventListener('click', () => this.togglePause());
 
     const soundBtn = document.getElementById('sound-btn');
-    soundBtn.addEventListener('click', () => {
-      const isEnabled = audioManager.toggleSound();
-      soundBtn.textContent = isEnabled ? '🔊 BGM ON' : '🔇 BGM OFF';
-    });
+    if (soundBtn) {
+      soundBtn.addEventListener('click', () => {
+        try {
+          const isEnabled = audioManager.toggleSound();
+          soundBtn.textContent = isEnabled ? '🔊 BGM ON' : '🔇 BGM OFF';
+        } catch (e) { }
+      });
+    }
 
-    document.getElementById('btn-left').addEventListener('click', () => this.moveRelative(-1));
-    document.getElementById('btn-right').addEventListener('click', () => this.moveRelative(1));
-    document.getElementById('btn-down').addEventListener('click', () => this.softDrop());
-    document.getElementById('btn-hard-drop').addEventListener('click', () => this.hardDrop());
-    document.getElementById('btn-rotate-cw').addEventListener('click', () => this.rotate(1));
-    document.getElementById('btn-rotate-ccw').addEventListener('click', () => this.rotate(-1));
-    document.getElementById('btn-hold').addEventListener('click', () => this.hold());
+    const btnLeft = document.getElementById('btn-left');
+    if (btnLeft) btnLeft.addEventListener('click', () => this.moveRelative(-1));
+
+    const btnRight = document.getElementById('btn-right');
+    if (btnRight) btnRight.addEventListener('click', () => this.moveRelative(1));
+
+    const btnDown = document.getElementById('btn-down');
+    if (btnDown) btnDown.addEventListener('click', () => this.softDrop());
+
+    const btnHardDrop = document.getElementById('btn-hard-drop');
+    if (btnHardDrop) btnHardDrop.addEventListener('click', () => this.hardDrop());
+
+    const btnRotateCw = document.getElementById('btn-rotate-cw');
+    if (btnRotateCw) btnRotateCw.addEventListener('click', () => this.rotate(1));
+
+    const btnRotateCcw = document.getElementById('btn-rotate-ccw');
+    if (btnRotateCcw) btnRotateCcw.addEventListener('click', () => this.rotate(-1));
+
+    const btnHold = document.getElementById('btn-hold');
+    if (btnHold) btnHold.addEventListener('click', () => this.hold());
   }
 }
 
