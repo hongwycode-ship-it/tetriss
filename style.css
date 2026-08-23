@@ -1,0 +1,414 @@
+/* ==========================================================================
+   CYBERPUNK NEON TETRIS - CSS DESIGN SYSTEM
+   ========================================================================== */
+
+/* 1. 디자인 변수 (컬러 토큰 & 글래스모피즘 설정) */
+:root {
+  --bg-color: #080711;
+  --bg-gradient: radial-gradient(circle at 50% 30%, #15102a 0%, #080711 70%);
+  --panel-bg: rgba(18, 14, 38, 0.75);
+  --border-neon: rgba(0, 240, 255, 0.3);
+  --border-neon-bright: #00f0ff;
+
+  /* 테트리스 블록 및 사이버 네온 키 컬러 */
+  --cyan: #00f0ff;
+  --magenta: #ff007f;
+  --yellow: #ffe600;
+  --green: #00ff66;
+  --purple: #aa00ff;
+  --orange: #ff6600;
+  --blue: #0066ff;
+
+  --text-main: #ffffff;
+  --text-muted: #8e8aa5;
+
+  --font-title: 'Orbitron', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+/* 2. 전역 스타일 리셋 */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  /* 드래그 및 셀렉션 금지 (게임 인터렉션 시 편의) */
+  -webkit-user-select: none;
+}
+
+body {
+  background: var(--bg-color);
+  background-image: var(--bg-gradient);
+  color: var(--text-main);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-x: hidden;
+  padding: 10px;
+}
+
+/* 3. 메인 게임 래퍼 */
+.game-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 900px;
+  width: 100%;
+}
+
+/* 헤더 영역 */
+.game-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-neon);
+  border-radius: 12px;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.15);
+}
+
+.neon-title {
+  font-family: var(--font-title);
+  font-size: 1.5rem;
+  letter-spacing: 2px;
+  color: var(--cyan);
+  text-shadow: 0 0 8px var(--cyan);
+}
+
+.neon-title .highlight {
+  color: var(--magenta);
+  text-shadow: 0 0 8px var(--magenta);
+}
+
+.header-controls {
+  display: flex;
+  gap: 8px;
+}
+
+/* 헤더 아이콘 버튼 */
+.icon-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-neon);
+  color: var(--text-main);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-family: var(--font-title);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.icon-btn:hover {
+  background: rgba(0, 240, 255, 0.2);
+  border-color: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan);
+  transform: translateY(-2px);
+}
+
+/* 4. 메인 컨테이너 (레이아웃) */
+.game-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 160px;
+}
+
+/* 카드 UI 공통 스타일 (Glassmorphism) */
+.card {
+  background: var(--panel-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-neon);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  transition: border-color 0.3s ease;
+}
+
+.card h2,
+.card h3 {
+  font-family: var(--font-title);
+  font-size: 0.85rem;
+  letter-spacing: 1px;
+  color: var(--cyan);
+  margin-bottom: 8px;
+  text-shadow: 0 0 5px var(--cyan);
+}
+
+.sub-text {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* 점수 및 스테이터스 카드 */
+.stats-card {
+  width: 100%;
+  align-items: stretch;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 8px;
+}
+
+.stat-item:last-child {
+  margin-bottom: 0;
+}
+
+.stat-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.stat-value {
+  font-family: var(--font-title);
+  font-size: 1.1rem;
+  color: var(--yellow);
+  text-shadow: 0 0 6px var(--yellow);
+}
+
+/* Next 블록 3개 스타일 */
+.next-previews {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 컨트롤 안내 카드 */
+.controls-info-card {
+  align-items: flex-start;
+}
+
+.controls-info-card ul {
+  list-style: none;
+  width: 100%;
+  font-size: 0.7rem;
+}
+
+.controls-info-card li {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+}
+
+.controls-info-card span {
+  color: var(--cyan);
+  font-weight: bold;
+}
+
+/* 5. 테트리스 캔버스 보드 세션 */
+.board-section {
+  display: flex;
+  justify-content: center;
+}
+
+.canvas-wrapper {
+  position: relative;
+  border-radius: 14px;
+  padding: 4px;
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.4), rgba(255, 0, 127, 0.4));
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.25);
+}
+
+#tetris-canvas {
+  background: #06050e;
+  border-radius: 10px;
+  display: block;
+}
+
+/* 캔버스 오버레이 (일시정지, 게임오버, 시작 화면) */
+.overlay {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  background: rgba(8, 7, 17, 0.88);
+  backdrop-filter: blur(8px);
+  border-radius: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+  transition: opacity 0.3s ease;
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.overlay-content {
+  text-align: center;
+  padding: 20px;
+}
+
+.overlay-content h2 {
+  font-family: var(--font-title);
+  font-size: 1.8rem;
+  color: var(--cyan);
+  text-shadow: 0 0 12px var(--cyan);
+  margin-bottom: 10px;
+}
+
+.overlay-content h2.danger-text {
+  color: var(--magenta);
+  text-shadow: 0 0 12px var(--magenta);
+}
+
+.overlay-content p {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.new-record {
+  color: var(--yellow) !important;
+  font-weight: bold;
+  font-size: 1rem !important;
+  animation: pulse-glow 1s infinite alternate;
+}
+
+/* 네온 버튼 */
+.neon-btn {
+  background: transparent;
+  border: 2px solid var(--cyan);
+  color: var(--cyan);
+  font-family: var(--font-title);
+  font-size: 0.9rem;
+  padding: 10px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-shadow: 0 0 5px var(--cyan);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+.neon-btn:hover {
+  background: var(--cyan);
+  color: #080711;
+  text-shadow: none;
+  box-shadow: 0 0 20px var(--cyan);
+  transform: scale(1.05);
+}
+
+/* 6. 모바일 온스크린 가상 터치 패드 */
+.touch-controls {
+  display: none;
+  /* 기본적으로 데스크톱에서는 숨김 처리 */
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 360px;
+  margin-top: 8px;
+}
+
+.touch-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.touch-btn {
+  flex: 1;
+  height: 48px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border-neon);
+  border-radius: 8px;
+  color: var(--text-main);
+  font-family: var(--font-title);
+  font-size: 1rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.touch-btn:active {
+  background: rgba(0, 240, 255, 0.3);
+  transform: scale(0.95);
+}
+
+.touch-btn.sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.touch-btn.action {
+  color: var(--cyan);
+  border-color: var(--cyan);
+}
+
+.touch-btn.danger {
+  color: var(--magenta);
+  border-color: var(--magenta);
+}
+
+/* 7. 반응형 미디어 쿼리 (태블릿/모바일 화면) */
+@media (max-width: 768px) {
+  body {
+    padding: 6px;
+  }
+
+  .game-container {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .panel {
+    flex-direction: row;
+    width: 100%;
+    max-width: 340px;
+    justify-content: space-between;
+  }
+
+  .left-panel .stats-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+
+  .controls-info-card {
+    display: none;
+    /* 모바일에서는 키보드 안내 숨김 */
+  }
+
+  .touch-controls {
+    display: flex;
+    /* 모바일 및 좁은 화면에서 가상 패드 노출 */
+  }
+}
+
+@keyframes pulse-glow {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
