@@ -1,8 +1,12 @@
 /**
  * ==========================================================================
  * CYBERPUNK 3D TETRIS - MAIN ENGINE (Three.js 기반 3D 입체 테트리스)
- * - Three.js 3D 공간 렌더링 (CDN 로딩 실패 시 예외 처리 보강)
- * - 🐍 3D 자율 이동 뱀(Cyber Snake) 캐릭터 AI (1칸 점프, 깔림 사망, 피하기 점수)
+ * - Three.js 3D 공간 렌더링
+ * - 🐍 3D 스마트 뱀(snake.png) 캐릭터 AI:
+ *   1) snake.png 이미지 스프라이트 적용
+ *   2) 떨어지는 블록 & Ghost Piece를 인지하는 스마트 위험 회피 AI
+ *   3) 1칸 점프 이동 기믹
+ *   4) 블록에 직접 깔릴 때만 정밀하게 찌그러짐 사망
  * - 5줄 지울 때마다 3D 타워 90도 카메라 회전 (4면 뷰포트 전환)
  * - 한 줄(1 라인) 지울 때마다 낙하 속도 즉시 증가 시스템
  * ==========================================================================
@@ -79,7 +83,7 @@ const TETROMINOES = {
   }
 };
 
-// 🐍 3. 3D 자율 이동 뱀 (Cyber Snake 3D) 클래스
+// 🐍 3. 3D 자율 이동 스마트 뱀 (snake.png 적용) 클래스
 class CyberSnake3D {
   constructor(game) {
     this.game = game;
@@ -90,7 +94,11 @@ class CyberSnake3D {
     this.dirX = 1;
     this.isDead = false;
     this.moveTimer = 0;
-    this.moveInterval = 350;
+    this.moveInterval = 320; // 0.32초마다 민첩하게 이동
+
+    // 🖼️ snake.png 텍스처 로더
+    this.textureLoader = window.THREE ? new THREE.TextureLoader() : null;
+    this.snakeTexture = this.textureLoader ? this.textureLoader.load('snake.png') : null;
 
     if (window.THREE && this.game.scene) {
       this.snakeGroup = new THREE.Group();
@@ -99,6 +107,7 @@ class CyberSnake3D {
     }
   }
 
+  // 뱀 3D 스프라이트 메쉬 생성 및 스폰
   spawn() {
     if (!window.THREE || !this.snakeGroup) return;
 
@@ -120,38 +129,83 @@ class CyberSnake3D {
     }
 
     this.meshList = [];
-    for (let i = 0; i < this.segmentCount; i++) {
-      const radius = i === 0 ? 0.42 : 0.32 - i * 0.04;
-      const geom = new THREE.SphereGeometry(radius, 14, 14);
-      const colorHex = i === 0 ? 0x00ff66 : 0xccff00;
-      const mat = new THREE.MeshStandardMaterial({
-        color: colorHex,
-        emissive: colorHex,
-        emissiveIntensity: 0.5,
-        roughness: 0.2
-      });
 
-      const mesh = new THREE.Mesh(geom, mat);
-      this.snakeGroup.add(mesh);
-      this.meshList.push(mesh);
+    // snake.png 스프라이트 재질 생성
+    const spriteMat = this.snakeTexture
+      ? new THREE.SpriteMaterial({ map: this.snakeTexture, transparent: true })
+      : new THREE.SpriteMaterial({ color: 0x00ff66 });
+
+    for (let i = 0; i < this.segmentCount; i++) {
+      // 머리는 크게, 몸통 마디는 약간씩 작게 연출
+      const scaleSize = i === 0 ? 1.1 : 0.85 - i * 0.08;
+      const sprite = new THREE.Sprite(spriteMat.clone());
+      sprite.scale.set(scaleSize, scaleSize, 1);
+
+      this.snakeGroup.add(sprite);
+      this.meshList.push(sprite);
     }
 
     this.update3DPosition();
     this.game.updateSnakeUI(true);
   }
 
+  // 3D 공간 상의 뱀 위치 및 스프라이트 방향(Flip) 갱신
   update3DPosition() {
     if (!this.meshList) return;
     for (let i = 0; i < this.segments.length; i++) {
       const seg = this.segments[i];
       const pos = this.game.gridTo3D(seg.x, seg.y);
       if (this.meshList[i]) {
-        this.meshList[i].position.set(pos.x, pos.y, pos.z + 0.1);
-        this.meshList[i].scale.set(1, 1, 1);
+        this.meshList[i].position.set(pos.x, pos.y, pos.z + 0.15);
+
+        // 뱀 이동 방향에 맞춰 좌우 Flip 및 스케일 유지
+        const scaleSize = i === 0 ? 1.1 : 0.85 - i * 0.08;
+        if (!this.isDead) {
+          this.meshList[i].scale.set(scaleSize * (this.dirX > 0 ? 1 : -1), scaleSize, 1);
+        }
       }
     }
   }
 
+  // 🧠 스마트 위험 회피 탐색 (낙하 중인 테트리스 블록 & Ghost Piece 실시간 인지)
+  scanDangerAndAvoid(headX) {
+    if (!this.game.currentPiece) return;
+
+    const piece = this.game.currentPiece;
+    const shape = piece.shape;
+    const px = piece.x;
+
+    // 떨어지는 블록이 보드 상에서 차지하는 가로 X범위 계산
+    let minBlockX = COLS;
+    let maxBlockX = -1;
+
+    for (let r = 0; r < shape.length; r++) {
+      for (let c = 0; c < shape[r].length; c++) {
+        if (shape[r][c] !== 0) {
+          const bx = px + c;
+          if (bx < minBlockX) minBlockX = bx;
+          if (bx > maxBlockX) maxBlockX = bx;
+        }
+      }
+    }
+
+    // 뱀 위치 주변 0~2칸 이내에 블록이 떨어지려고 하면 위험 경보!
+    const isDangerZone = headX >= minBlockX - 1 && headX <= maxBlockX + 1;
+
+    if (isDangerZone) {
+      // 위험 구역의 반대쪽 안전한 방향(좌측 또는 우측)으로 회피 방향 결정
+      const distToLeft = Math.abs(headX - (minBlockX - 1));
+      const distToRight = Math.abs(headX - (maxBlockX + 1));
+
+      if (distToLeft < distToRight && headX > 0) {
+        this.dirX = -1; // 왼쪽 안전 구역으로 도망
+      } else if (headX < COLS - 1) {
+        this.dirX = 1;  // 오른쪽 안전 구역으로 도망
+      }
+    }
+  }
+
+  // 🐍 자율 이동 AI (스마트 피하기 + 1칸 점프 제한)
   updateAI(deltaTime) {
     if (this.isDead || !this.game.isPlaying || this.game.isPaused) return;
 
@@ -160,8 +214,13 @@ class CyberSnake3D {
     this.moveTimer = 0;
 
     const head = this.segments[0];
+
+    // 🧠 1. 떨어지는 블록 위험 실시간 스캔하여 피하기 방향 설정
+    this.scanDangerAndAvoid(head.x);
+
     let nextX = head.x + this.dirX;
 
+    // 보드 벽 감지 시 즉시 방향 반전
     if (nextX < 0 || nextX >= COLS) {
       this.dirX *= -1;
       nextX = head.x + this.dirX;
@@ -169,18 +228,20 @@ class CyberSnake3D {
 
     const currentTopY = this.game.getTopRowAt(head.x);
     const targetTopY = this.game.getTopRowAt(nextX);
-
     const heightDifference = currentTopY - targetTopY;
 
     let canMove = false;
     let nextY = targetTopY;
 
     if (heightDifference === 1) {
+      // 🌟 1칸 점프 등반 성공!
       canMove = true;
       try { audioManager.playSnakeJump(); } catch (e) { }
     } else if (heightDifference <= 0) {
+      // 평지 또는 미끄러짐 이동
       canMove = true;
     } else {
+      // 높이 차이 2칸 이상: 점프 불가능! 장애물에 막힘 ➔ 방향 반전하여 회피
       this.dirX *= -1;
       nextX = head.x + this.dirX;
       const altTargetY = this.game.getTopRowAt(nextX);
@@ -202,9 +263,11 @@ class CyberSnake3D {
     }
   }
 
+  // 💥 오직 블록에 실제로 깔릴 때만 정밀 사망 판정!
   checkCrush(boardGrid) {
     if (this.isDead || !this.segments) return;
 
+    // 뱀 마디 위치 좌표(x, y)에 정착된 테트리스 블록이 실제로 중첩된 경우만 찌그러짐 사망
     for (let seg of this.segments) {
       if (seg.y >= 0 && seg.y < ROWS && seg.x >= 0 && seg.x < COLS) {
         if (boardGrid[seg.y][seg.x] !== 0) {
@@ -215,16 +278,19 @@ class CyberSnake3D {
     }
   }
 
+  // 뱀 찌그러짐 사망 처리
   die() {
     if (this.isDead) return;
     this.isDead = true;
 
+    // 납작하게 찌그러지는 Squish 효과
     if (this.meshList) {
       this.meshList.forEach(mesh => {
-        mesh.scale.set(1.5, 0.1, 1.5);
+        mesh.scale.set(1.4, 0.15, 1);
       });
     }
 
+    // 3D 파티클 폭발 이펙트
     const head = this.segments[0];
     const pos = this.game.gridTo3D(head.x, head.y);
     this.game.create3DParticles(pos.x, pos.y, pos.z, 0xff007f);
@@ -233,6 +299,7 @@ class CyberSnake3D {
     this.game.showSnakeEventBanner("💥 SNAKE CRUSHED!", true);
     this.game.updateSnakeUI(false);
 
+    // 2.5초 후 바닥에서 안전하게 재스폰
     clearTimeout(this.respawnTimer);
     this.respawnTimer = setTimeout(() => {
       if (this.game.isPlaying && !this.game.isGameOver) {
@@ -315,7 +382,6 @@ class Tetris3DGame {
       this.highScoreDisplay.textContent = this.highScore;
     }
 
-    // 🌟 Three.js 예외 처리 보강
     if (!window.THREE) {
       console.warn("Three.js 라이브러리가 로드되지 않았습니다. CDN 연결을 확인해 주세요.");
     } else {
@@ -630,6 +696,7 @@ class Tetris3DGame {
       }
     }
 
+    // 🐍 뱀 피하기 성공 판정
     if (this.snake && !this.snake.isDead && this.snake.segments && this.snake.segments.length > 0) {
       const snakeHead = this.snake.segments[0];
       const dist = Math.abs(snakeHead.x - x);
@@ -640,6 +707,7 @@ class Tetris3DGame {
       }
     }
 
+    // 💥 블록 착지 후 정밀 깔림 사망 검사
     if (this.snake) {
       this.snake.checkCrush(this.grid);
     }
@@ -992,7 +1060,6 @@ class Tetris3DGame {
   }
 
   start() {
-    // 오디오 컨텍스트 사용자 상호작용 후 안전 활성화
     try { audioManager.init(); } catch (e) { }
 
     this.clearBoard3DMeshes();
